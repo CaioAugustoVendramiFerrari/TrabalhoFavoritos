@@ -220,6 +220,6 @@ const estilos = StyleSheet.create({
     tituloFavorito: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#C2185B',
+        color: '#000000',
     },
 });
