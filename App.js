@@ -1,284 +1,225 @@
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useState, useEffect } from 'react';
-import { ScrollView, Text, View, StyleSheet, Button, Alert, TouchableOpacity } from 'react-native';
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { View, Text, ScrollView, StyleSheet, Button, Alert, SafeAreaView, StatusBar } from "react-native";
+import { useState, useEffect } from "react";
 import SyncStorage from 'sync-storage';
 
 const Stack = createNativeStackNavigator();
-const URL_API = `https://jsonplaceholder.typicode.com/posts`;
-const URL_COMENTARIOS = `https://jsonplaceholder.typicode.com/posts/`;
+const API_URL_POSTS = 'https://jsonplaceholder.typicode.com/posts';
 
-function TelaInicial({ navigation }) {
-    const [dados, setDados] = useState([]);
+const TelaInicial = ({ navigation }) => {
+    const [posts, setPosts] = useState([]);
 
     useEffect(() => {
-        const carregarDados = async () => {
+        const obterPosts = async () => {
             try {
-                const resposta = await fetch(URL_API);
-                const resultado = await resposta.json();
-                setDados(resultado);
+                const resposta = await fetch(API_URL_POSTS);
+                const dados = await resposta.json();
+                setPosts(dados);
             } catch {
-                Alert.alert('Falha ao carregar os posts');
+                Alert.alert("Erro", "Não foi possível carregar os posts.");
             }
         };
-        carregarDados();
+        obterPosts();
     }, []);
 
     return (
-        <ScrollView style={styles.containerScroll}>
-            <View style={styles.containerPrincipal}>
-                <Text style={styles.titulo}>Tela Inicial</Text>
-
-                <TouchableOpacity
-                    style={styles.botao}
-                    onPress={() => navigation.navigate("Favoritos")}
-                >
-                    <Text style={styles.textoBotao}>Favoritos</Text>
-                </TouchableOpacity>
-
-                {dados.map(item => (
-                    <View key={item.id} style={styles.cartao}>
-                        <View style={styles.conteudoCartao}>
-                            <Text style={styles.tituloCartao}>Título: {item.title}</Text>
-                        </View>
+        <SafeAreaView style={estilos.areaSegura}>
+            <ScrollView style={estilos.scrollView}>
+                <View style={estilos.container}>
+                    <Text style={estilos.titulo}>Lista de Posts</Text>
+                    <View style={estilos.botaoContainer}>
                         <Button
-                            title='VER'
-                            color="blue"
-                            onPress={() => navigation.navigate("DetalhesPost", { id: item.id })}
+                            title="Ver Favoritos"
+                            color="#4A90E2"
+                            onPress={() => navigation.navigate("Favoritos")}
                         />
                     </View>
-                ))}
-            </View>
-        </ScrollView>
+                    {posts.map(post => (
+                        <View key={post.id} style={estilos.card}>
+                            <Text style={estilos.tituloPost}>{post.title.replace(/\n/g, " ")}</Text>
+                            <Button
+                                title="Detalhes"
+                                color="#4A90E2"
+                                onPress={() => navigation.navigate("VisualizarPosts", { id: post.id, title: post.title, body: post.body })}
+                            />
+                        </View>
+                    ))}
+                </View>
+            </ScrollView>
+        </SafeAreaView>
     );
-}
+};
 
-function TelaFavoritos({ navigation }) {
-    const [favoritos, setFavoritos] = useState([]);
+const VisualizarPosts = ({ route }) => {
+    const [comentarios, setComentarios] = useState([]);
+    const { id, title, body } = route.params;
 
     useEffect(() => {
-        const carregarFavoritos = async () => {
+        const obterComentarios = async () => {
             try {
-                const listaFav = SyncStorage.get('favorites') ? JSON.parse(SyncStorage.get('favorites')) : [];
-                setFavoritos(listaFav);
-            } catch (error) {
-                console.error('Erro ao recuperar favoritos:', error);
+                const resposta = await fetch(`${API_URL_POSTS}/${id}/comments`);
+                const dados = await resposta.json();
+                setComentarios(dados);
+            } catch {
+                Alert.alert("Erro", "Não foi possível carregar os comentários.");
+            }
+        };
+        obterComentarios();
+    }, [id]);
+
+    const adicionarFavoritos = async () => {
+        try {
+            const favoritos = SyncStorage.get('favoritos') || [];
+            const postFavorito = { id, title, body };
+            if (!favoritos.some(post => post.id === postFavorito.id)) {
+                favoritos.push(postFavorito);
+                SyncStorage.set('favoritos', favoritos);
+                Alert.alert("Sucesso", "Post adicionado aos favoritos!");
+            } else {
+                Alert.alert("Aviso", "Post já está nos favoritos.");
+            }
+        } catch {
+            Alert.alert("Erro", "Não foi possível favoritar o post.");
+        }
+    };
+
+    return (
+        <SafeAreaView style={estilos.areaSegura}>
+            <ScrollView style={estilos.scrollView}>
+                <View style={estilos.container}>
+                    <Text style={estilos.titulo}>{title.replace(/\n/g, " ")}</Text>
+                    <Text style={estilos.textoBody}>{body.replace(/\n/g, " ")}</Text>
+                    <Button title="Favoritar" color="#4A90E2" onPress={adicionarFavoritos} />
+                    <Text style={estilos.titulo}>Comentários</Text>
+                    {comentarios.map(comentario => (
+                        <View key={comentario.id} style={estilos.cardComentario}>
+                            <Text style={estilos.nomeComentario}>Nome: {comentario.name}</Text>
+                            <Text>Email: {comentario.email}</Text>
+                            <Text>Comentário: {comentario.body.replace(/\n/g, " ")}</Text>
+                        </View>
+                    ))}
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
+};
+
+const Favoritos = ({ navigation }) => {
+    const [postsFavoritos, setPostsFavoritos] = useState([]);
+
+    useEffect(() => {
+        const carregarFavoritos = () => {
+            try {
+                const favoritos = SyncStorage.get('favoritos') || [];
+                setPostsFavoritos(favoritos);
+            } catch {
+                Alert.alert("Erro", "Não foi possível carregar os posts favoritos.");
             }
         };
         carregarFavoritos();
     }, []);
 
     return (
-        <ScrollView style={styles.containerScroll}>
-            <View style={styles.containerPrincipal}>
-                <Text style={styles.titulo}>Favoritos</Text>
-                <View style={styles.containerFavoritos}>
-                    {favoritos.length > 0 ? (
-                        favoritos.map((fav) => (
-                            <TouchableOpacity
-                                key={fav.id}
-                                onPress={() => navigation.navigate("DetalhesPost", { id: fav.id })}
-                            >
-                                <View style={styles.cartaoFavorito}>
-                                    <Text style={styles.tituloFavorito}>Título: {fav.title}</Text>
-                                    <Text style={styles.descricaoFavorito}>Descrição: {fav.body}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))
-                    ) : (
-                        <Text style={styles.mensagemSemFavoritos}>Nenhum favorito encontrado.</Text>
-                    )}
+        <SafeAreaView style={estilos.areaSegura}>
+            <ScrollView style={estilos.scrollView}>
+                <View style={estilos.container}>
+                    <Text style={estilos.titulo}>Posts Favoritos</Text>
+                    {postsFavoritos.map(post => (
+                        <View key={post.id} style={estilos.card}>
+                            <Text style={estilos.tituloFavorito}>{post.title}</Text>
+                            <View style={estilos.botaoContainer}>
+                                <Button
+                                    title="Ver Detalhes"
+                                    color="#4A90E2"
+                                    onPress={() => navigation.navigate("VisualizarPosts", { id: post.id, title: post.title, body: post.body })}
+                                />
+                            </View>
+                        </View>
+                    ))}
                 </View>
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </SafeAreaView>
     );
-}
-
-function DetalhesPost({ route }) {
-    const [detalhesPost, setDetalhesPost] = useState({});
-    const [comentarios, setComentarios] = useState([]);
-    const [ehFavorito, setEhFavorito] = useState(false);
-
-    useEffect(() => {
-        const carregarPost = async () => {
-            try {
-                const resposta = await fetch(`${URL_COMENTARIOS}${route.params.id}`);
-                const post = await resposta.json();
-                setDetalhesPost(post);
-
-                const favoritos = SyncStorage.get('favorites') ? JSON.parse(SyncStorage.get('favorites')) : [];
-                setEhFavorito(favoritos.some(fav => fav.id === post.id));
-            } catch {
-                Alert.alert('Falha ao carregar o post');
-            }
-        };
-        carregarPost();
-    }, [route.params.id]);
-
-    useEffect(() => {
-        const carregarComentarios = async () => {
-            try {
-                const resposta = await fetch(`${URL_COMENTARIOS}${route.params.id}/comments`);
-                const dadosComentarios = await resposta.json();
-                setComentarios(dadosComentarios);
-            } catch {
-                Alert.alert('Falha ao carregar comentários');
-            }
-        };
-        carregarComentarios();
-    }, [route.params.id]);
-
-    const alternarFavorito = async () => {
-        try {
-            const favoritos = SyncStorage.get('favorites') ? JSON.parse(SyncStorage.get('favorites')) : [];
-            const novoPost = { id: detalhesPost.id, title: detalhesPost.title, body: detalhesPost.body };
-
-            if (ehFavorito) {
-                const favoritosAtualizados = favoritos.filter(fav => fav.id !== detalhesPost.id);
-                await SyncStorage.set('favorites', JSON.stringify(favoritosAtualizados));
-                setEhFavorito(false);
-            } else {
-                favoritos.push(novoPost);
-                await SyncStorage.set('favorites', JSON.stringify(favoritos));
-                setEhFavorito(true);
-            }
-        } catch {
-            Alert.alert('Falha ao atualizar favoritos');
-        }
-    };
-
-    return (
-        <ScrollView style={styles.containerScroll}>
-            <View style={styles.containerPrincipal}>
-                <Text style={styles.titulo}>Detalhes do Post</Text>
-                <View style={styles.containerDetalhes}>
-                    <Text style={styles.tituloPost}>Título: {detalhesPost.title}</Text>
-                    <Text style={styles.corpoPost}>Corpo: {detalhesPost.body}</Text>
-                    <TouchableOpacity onPress={alternarFavorito} style={styles.botao}>
-                        <Text style={styles.textoBotao}>
-                            {ehFavorito ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-                <Text style={styles.tituloComentarios}>Comentários:</Text>
-                {comentarios.map(comentario => (
-                    <View key={comentario.id} style={styles.comentario}>
-                        <Text style={styles.autorComentario}>Nome: {comentario.name}</Text>
-                        <Text style={styles.corpoComentario}>Corpo: {comentario.body}</Text>
-                        <Text style={styles.emailComentario}>Email: {comentario.email}</Text>
-                    </View>
-                ))}
-            </View>
-        </ScrollView>
-    );
-}
+};
 
 export default function App() {
     return (
         <NavigationContainer>
             <Stack.Navigator>
-                <Stack.Screen
-                    name="TelaInicial"
-                    component={TelaInicial}
-                    options={{ title: "Início" }}
-                />
-                <Stack.Screen
-                    name="DetalhesPost"
-                    component={DetalhesPost}
-                    options={{ title: "Detalhes do Post" }}
-                />
-                <Stack.Screen
-                    name="Favoritos"
-                    component={TelaFavoritos}
-                    options={{ title: "Meus Favoritos" }}
-                />
+                <Stack.Screen name="Tela Inicial" component={TelaInicial} options={{ title: "Tela Inicial" }} />
+                <Stack.Screen name="VisualizarPosts" component={VisualizarPosts} options={{ title: "Detalhes do Post" }} />
+                <Stack.Screen name="Favoritos" component={Favoritos} options={{ title: "Favoritos" }} />
             </Stack.Navigator>
         </NavigationContainer>
     );
 }
 
-const styles = StyleSheet.create({
-    containerScroll: {
-        flex: 1,
-        backgroundColor: '#e9ecef',
+const estilos = StyleSheet.create({
+    areaSegura: {
+        paddingTop: StatusBar.currentHeight,
+        backgroundColor: '#f5f5f5',
     },
-    containerPrincipal: {
+    container: {
         flex: 1,
         alignItems: "center",
-        padding: 15,
+        justifyContent: "flex-start",
+        padding: 10,
+    },
+    card: {
+        width: "90%",
+        borderWidth: 1,
+        borderColor: "#B0BEC5",
+        backgroundColor: "#E0F7FA",
+        borderRadius: 12,
+        marginBottom: 15,
+        padding: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+    },
+    scrollView: {
+        margin: 5,
+    },
+    tituloPost: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#00796B',
+        marginBottom: 5,
+    },
+    botaoContainer: {
+        marginVertical: 8,
     },
     titulo: {
-        fontSize: 26,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        color: '#000000',
         marginVertical: 15,
     },
-    cartao: {
-        width: "100%",
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 12,
-        shadowColor: '#444',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 4,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+    textoBody: {
+        fontSize: 16,
+        color: '#424242',
+        paddingVertical: 10,
+        textAlign: 'justify',
     },
-    conteudoCartao: {
-        flex: 1,
-    },
-    tituloCartao: {
-        fontSize: 18,
-        fontWeight: '500',
-    },
-    containerFavoritos: {
-        width: "100%",
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 20,
-        shadowColor: '#444',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 4,
-    },
-    cartaoFavorito: {
-        width: "100%",
-        backgroundColor: "#fff",
-        borderRadius: 12,
+    cardComentario: {
+        width: '100%',
         padding: 10,
         marginBottom: 8,
-        shadowColor: '#444',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        borderRadius: 8,
+        backgroundColor: '#E1F5FE',
+        borderWidth: 1,
+        borderColor: '#BBDEFB',
+    },
+    nomeComentario: {
+        fontWeight: 'bold',
+        color: '#1976D2',
     },
     tituloFavorito: {
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    descricaoFavorito: {
-        fontSize: 14,
-        color: '#666',
-    },
-    mensagemSemFavoritos: {
-        fontSize: 16,
-        color: '#777',
-        marginTop: 15,
-    },
-    containerDetalhes: {
-        width: "100%",
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 20,
-        shadowColor: '#444',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#C2185B',
     },
 });
